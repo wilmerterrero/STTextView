@@ -471,6 +471,13 @@ import AVFoundation
             textLayoutManager.invalidateLayout(for: textLayoutManager.documentRange)
         }
     }
+    
+    /// CUSTOM Var to store diffs highlights
+    public var diffHighlights: [(range: NSTextRange, color: CGColor)] = [] {
+        didSet {
+            needsDisplay = true
+        }
+    }
 
     /// A Boolean value that indicates whether incremental searching is enabled.
     ///
@@ -809,7 +816,63 @@ import AVFoundation
         {
             drawHighlightedLine(in: rect)
         }
+        if !diffHighlights.isEmpty {
+            drawHighlightedDiffLines(in: rect)
+        }
     }
+    
+    private func drawHighlightedDiffLines(in rect: NSRect) {
+        func drawHighlight(in fillRect: CGRect, color: CGColor) {
+            guard let context = NSGraphicsContext.current?.cgContext else {
+                print("No graphics context available")
+                return
+            }
+            print("Drawing highlight in rect: \(fillRect)")
+            context.saveGState()
+            context.setFillColor(color)
+            context.fill(fillRect)
+            context.restoreGState()
+        }
+
+        for diffHighlight in diffHighlights {
+            let range = diffHighlight.range
+            let color = diffHighlight.color
+            guard let viewportRange = textLayoutManager.textViewportLayoutController.viewportRange else {
+                print("Viewport range is nil")
+                return
+            }
+
+            print("Viewport range: \(viewportRange)")
+            textLayoutManager.enumerateTextLayoutFragments(in: viewportRange) { layoutFragment in
+                let contentRangeInElement = layoutFragment.rangeInElement
+                print("Content range in element: \(contentRangeInElement), Diff range: \(range)")
+                if contentRangeInElement.intersects(range) {
+                    for lineFragment in layoutFragment.textLineFragments {
+                        let lineFragmentFrame = layoutFragment.layoutFragmentFrame
+                        print("Line fragment frame: \(lineFragmentFrame)")
+                        var highlightRect = CGRect(
+                            x: lineFragmentFrame.origin.x,
+                            y: lineFragmentFrame.origin.y + lineFragment.typographicBounds.minY,
+                            width: rect.size.width,
+                            height: lineFragmentFrame.size.height
+                        )
+//                            highlightRect = highlightRect.intersection(rect)
+                        print("Highlight rect: \(highlightRect)")
+                        if !highlightRect.isEmpty {
+                            drawHighlight(in: highlightRect, color: color)
+                            print("Drawing highlight at: \(highlightRect) with color: \(color)")
+
+                        } else {
+                            print("Highlight rect is empty after intersection with dirty rect")
+                        }
+                    }
+                }
+                return true
+            }
+        }
+    }
+
+
 
     private func drawHighlightedLine(in rect: NSRect) {
 
@@ -928,7 +991,8 @@ import AVFoundation
     /// Add attribute. Need `needsViewportLayout = true` to reflect changes.
     open func addAttributes(_ attrs: [NSAttributedString.Key: Any], range: NSRange, updateLayout: Bool = true) {
         guard let textRange = NSTextRange(range, in: textContentManager) else {
-            preconditionFailure("Invalid range \(range)")
+            print("Invalid range \(range)")
+            return
         }
 
         addAttributes(attrs, range: textRange, updateLayout: updateLayout)

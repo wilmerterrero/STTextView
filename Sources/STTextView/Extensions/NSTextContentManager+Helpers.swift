@@ -5,13 +5,13 @@ import AppKit
 import STTextKitPlus
 
 extension NSTextContentManager {
-
+    
     /// Attributes at location
     func attributes(at location: NSTextLocation) -> [NSAttributedString.Key: Any] {
         guard !documentRange.isEmpty else {
             return [:]
         }
-
+        
         let effectiveLocation: NSTextLocation
         if location == documentRange.location {
             effectiveLocation = location
@@ -20,7 +20,7 @@ extension NSTextContentManager {
         } else {
             effectiveLocation = location
         }
-
+        
         // requires non-empty range
         return attributedString(
             in: NSTextRange(
@@ -32,6 +32,11 @@ extension NSTextContentManager {
             effectiveRange: nil
         ) ?? [:]
     }
-
-
+    
+    public func textRange(for range: NSRange) -> NSTextRange? {
+        guard let textRangeLocation = location(documentRange.location, offsetBy: range.location),
+              let endLocation = location(textRangeLocation, offsetBy: range.length) else { return nil }
+        return NSTextRange(location: textRangeLocation, end: endLocation)
+    }
+    
 }
